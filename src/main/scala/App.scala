@@ -9,10 +9,22 @@ trait Tree[A] {
   case class Leaf[F](value: A) extends TreeF[F]
   case class Empty[F]() extends TreeF[F]
 
-  implicit val btFunctor: Functor[TreeF] =
+  val r2lNodeFunctor: Functor[Node] = new Functor[Node] {
+    def map[B, C](n: Node[B])(f: B => C): Node[C] = {
+      val r = f(n.right)
+      val l = f(n.left)
+      Node(n.value, l, r)
+    }
+  }
+  val l2rNodeFunctor: Functor[Node] = new Functor[Node] {
+    def map[B, C](n: Node[B])(f: B => C): Node[C] =
+      Node(n.value, f(n.left), f(n.right))
+  }
+
+  implicit def btFunctor(implicit NF: Functor[Node]): Functor[TreeF] =
     new Functor[TreeF] {
       def map[B, C](fa: TreeF[B])(f: B => C): TreeF[C] = fa match {
-        case Node(v, l, r) => Node(v, f(l), f(r))
+        case (n: Node[B]) => NF.map(n)(f)
         case Leaf(v) => Leaf(v)
         case Empty() => Empty()
       }
@@ -42,9 +54,20 @@ object IntTree extends Tree[Int] {
           Fix(Leaf(35)))))),
       Fix(Leaf(83))))
 
-  def run() = Cata[TreeF, Unit](print)(x)
+  def printr2l() = {
+    implicit val nf = r2lNodeFunctor
+    Cata[TreeF, Unit](print)(x)
+  }
 
-  def printdflb() = Cata[TreeF, List[Int]](dflb)(x).map(println)
+  def printl2r() = {
+    implicit val nf = l2rNodeFunctor
+    Cata[TreeF, Unit](print)(x)
+  }
+
+  def printdflb() = {
+    implicit val nf = l2rNodeFunctor
+    Cata[TreeF, List[Int]](dflb)(x).foreach(println)
+  }
 }
 
 case class Fix[F[_]](unfix: F[Fix[F]])
